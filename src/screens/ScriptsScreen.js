@@ -1,24 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
 import ScriptCard from '../components/ScriptCard';
+import { useScripts } from '../context/ScriptContext';
 
 export default function ScriptsScreen() {
     const insets = useSafeAreaInsets();
 
-    // Simulated initial state: By default, we'll start with one demo script for testing, 
-    // but let's toggle between empty and populated array to see both states later.
-    const [scripts, setScripts] = useState([
-        {
-            id: '1',
-            title: 'Demo Script',
-            wordCount: 191,
-            time: '01:09 PM',
-            date: 'Feb 16, 2026',
-        }
-    ]);
+    // Pull the scripts array from our global Context!
+    const { scripts } = useScripts();
 
     // This function renders the empty state when the `scripts` array is empty.
     const renderEmptyState = () => (
@@ -41,10 +33,6 @@ export default function ScriptsScreen() {
                 </TouchableOpacity>
 
                 <Text style={styles.headerTitle}>Scripts</Text>
-
-                <TouchableOpacity style={styles.iconButton}>
-                    <Ionicons name="diamond" size={24} color="#5E81FF" />
-                </TouchableOpacity>
             </View>
 
             {/* Secondary Action Bar (Select, Filter, Add Folder) */}
