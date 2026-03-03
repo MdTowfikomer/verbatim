@@ -151,9 +151,21 @@ export default function TeleprompterScreen() {
 
     const toggleScroll = () => {
         if (!isPlaying) {
-            startActionWithCountdown(() => setIsPlaying(true));
+            // startActionWithCountdown(() => setIsPlaying(true));
+            setIsPlaying(true);
         } else {
             setIsPlaying(false);
+        }
+        if (showSpeedControl) setShowSpeedControl(false);
+        if (showStyleControl) setShowStyleControl(false);
+    };
+    const toggleRecordingAndScroll = () => {
+        if (!isPlaying) {
+            startActionWithCountdown(() => setIsPlaying(true));
+            toggleRecording();
+        } else {
+            setIsPlaying(false);
+            toggleRecording();
         }
         if (showSpeedControl) setShowSpeedControl(false);
         if (showStyleControl) setShowStyleControl(false);
@@ -307,10 +319,12 @@ export default function TeleprompterScreen() {
                 isHorizontalMode ? styles.bottomControlsHoriz : styles.bottomControlsPortrait,
                 { paddingBottom: isHorizontalMode ? 20 : insets.bottom + 20 }
             ]}>
+                {/* camera reverse */}
                 <TouchableOpacity style={styles.controlSquare} onPress={toggleCameraFacing}>
-                    <Ionicons name="camera-reverse-outline" size={28} color="#FFFFFF" />
+                    <Ionicons name="camera-reverse-outline" size={28} color="#FFFFFF" />  
                 </TouchableOpacity>
 
+                {/* font size */}
                 <TouchableOpacity
                     style={[styles.controlSquare, showStyleControl && { backgroundColor: Colors.primary }]}
                     onPress={() => {
@@ -321,23 +335,28 @@ export default function TeleprompterScreen() {
                     <Ionicons name="text-outline" size={26} color="#FFFFFF" />
                 </TouchableOpacity>
 
+                {/* record */}
                 <TouchableOpacity
                     style={[styles.recordOuter, isRecording && { borderColor: '#FF5722' }]}
-                    onPress={toggleRecording}
+                    onPress={()=>{
+                        toggleRecordingAndScroll();
+                    }}
                 >
                     <View style={[styles.recordInner, isRecording && { borderRadius: 8, width: 30, height: 30 }]} />
                 </TouchableOpacity>
 
+                {/* speed */}
                 <TouchableOpacity
                     style={[styles.controlSquare, showSpeedControl && { backgroundColor: Colors.primary }]}
                     onPress={() => {
                         setShowSpeedControl(!showSpeedControl);
                         setShowStyleControl(false);
                     }}
-                >
+                >   
                     <Ionicons name="speedometer-outline" size={28} color="#FFFFFF" />
                 </TouchableOpacity>
 
+                {/* play/pause */}
                 <TouchableOpacity style={[styles.controlSquare, { backgroundColor: isPlaying ? Colors.card : Colors.primary }]} onPress={toggleScroll}>
                     <Ionicons name={isPlaying ? "pause" : "play"} size={28} color="#FFFFFF" />
                 </TouchableOpacity>

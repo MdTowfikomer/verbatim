@@ -42,11 +42,12 @@ This document provides a comprehensive analysis of the current codebase and a st
 | **Landscape Mode** | Split-screen broadcasting. | Use `expo-screen-orientation` to enable side-by-side teleprompter and video in horizontal orientation. | ✅ Complete |
 | **Countdown Timer** | 3-2-1 timer before scroll starts. | Simple overlay state that triggers the `isPlaying` state after 3 seconds. | ✅ Complete |
 
-### Phase 3: Advanced Features
-| Feature | Description | Implementation Detail |
-| :--- | :--- | :--- |
-| **PiP Mode** | Use prompter over other apps. | Use `expo-video` or native Android PiP modules for overlay support. |
-| **Voice Activation** | Scroll based on voice detection. | (Experimental) Integrate Speech-to-Text to sync scroll speed with speech. |
+### Phase 3: Advanced Features & Playback 🚧
+| Feature | Description | Implementation Detail | Status |
+| :--- | :--- | :--- | :--- |
+| **Video Playback** | Review videos in-app. | Integrated `expo-video` to build a fullscreen `VideoPlaybackModal` in Gallery. | ✅ Complete |
+| **Edit Scripts** | Modify existing scripts. | Add `editScript` to `ScriptContext` and update `AddScriptScreen` to accept initial data. | ✅ Complete |
+| **Voice Activation** | Scroll based on voice detection. | (Experimental) Not planned for current release. | ❌ Canceled |
 
 ---
 

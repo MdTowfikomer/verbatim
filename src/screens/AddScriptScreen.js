@@ -2,17 +2,20 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Colors } from '../constants/Colors';
 import { useScripts } from '../context/ScriptContext';
 
 export default function AddScriptScreen() {
     const insets = useSafeAreaInsets();
     const navigation = useNavigation();
-    const { addScript } = useScripts(); // Pull the addScript function from Context
+    const route = useRoute();
+    const { addScript, editScript } = useScripts(); // Pull functions from Context
 
-    const [title, setTitle] = useState('Untitled script - 1');
-    const [content, setContent] = useState('');
+    const existingScript = route.params?.script;
+
+    const [title, setTitle] = useState(existingScript ? existingScript.title : 'Untitled script - 1');
+    const [content, setContent] = useState(existingScript ? existingScript.content : '');
 
     // Count words by splitting on whitespace
     const wordCount = content.trim().length === 0 ? 0 : content.trim().split(/\s+/).length;
@@ -26,19 +29,24 @@ export default function AddScriptScreen() {
         const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
         const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-        // Store the new script globally
-        const newScript = {
+        // Prepare the script data
+        const scriptData = {
             title,
             content,
             wordCount,
             date: dateStr,
             time: timeStr
         };
-        addScript(newScript);
 
-        // Go exactly to the Preview screen as requested!
-        // We pass the new script object as a parameter so PreviewScreen can show it.
-        navigation.navigate('Preview', { script: newScript });
+        if (existingScript) {
+            editScript(existingScript.id, scriptData);
+            navigation.navigate('Preview', { script: { ...existingScript, ...scriptData } });
+        } else {
+            // Generate ID here so Preview receives it immediately, or Context will handle it if we sync
+            const newScript = { ...scriptData, id: Date.now().toString() };
+            addScript(newScript);
+            navigation.navigate('Preview', { script: newScript });
+        }
     };
 
     return (

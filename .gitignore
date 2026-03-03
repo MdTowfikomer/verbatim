@@ -39,3 +39,12 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# implementation.md
+implementation.md
+implementation_voice_activation.md
+
+# pdf-api
+.env
+node_modules
+

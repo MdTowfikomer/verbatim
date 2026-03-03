@@ -23,11 +23,17 @@ export default function PreviewScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.headerRight}>
-                    <TouchableOpacity style={styles.iconButton}>
+                    {/* <TouchableOpacity style={styles.iconButton}>
                         <Ionicons name="pencil" size={20} color={Colors.textPrimary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.iconButton}>
-                        <Ionicons name="diamond" size={24} color="#5E81FF" />
+                    </TouchableOpacity> */}
+
+                    <TouchableOpacity
+                        style={styles.iconButton}
+                        onPress={() => {
+                            navigation.navigate('AddScript', { script });
+                        }}
+                    >
+                        <Ionicons name="pencil" size={20} color={Colors.textPrimary} />
                     </TouchableOpacity>
                 </View>
             </View>

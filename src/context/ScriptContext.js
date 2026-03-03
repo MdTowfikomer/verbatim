@@ -101,6 +101,13 @@ export const ScriptProvider = ({ children }) => {
         setRecordings(prev => [newRecording, ...prev]);
     };
 
+    // Function to edit an existing script by ID
+    const editScript = (id, updatedScript) => {
+        setScripts(prevScripts => prevScripts.map(script =>
+            script.id === id ? { ...script, ...updatedScript } : script
+        ));
+    };
+
     // Function to delete a script by ID
     const deleteScript = (id) => {
         setScripts(prevScripts => prevScripts.filter(script => script.id !== id));
@@ -112,7 +119,7 @@ export const ScriptProvider = ({ children }) => {
     };
 
     return (
-        <ScriptContext.Provider value={{ scripts, addScript, deleteScript, recordings, addRecording, deleteRecording }}>
+        <ScriptContext.Provider value={{ scripts, addScript, editScript, deleteScript, recordings, addRecording, deleteRecording }}>
             {children}
         </ScriptContext.Provider>
     );
