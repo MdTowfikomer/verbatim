@@ -1,21 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView, PanResponder, Animated, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions, ScrollView, PanResponder, Animated, Alert, Dimensions } from 'react-native';
 import { Camera, CameraView } from 'expo-camera';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Colors } from '../constants/Colors';
-import { useScripts } from '../context/ScriptContext'; // 1. Import our Context hook
-
-const { width, height: SCREEN_HEIGHT } = Dimensions.get('window');
+import { useScripts } from '../context/ScriptContext';
 
 export default function TeleprompterScreen() {
+    const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
     const insets = useSafeAreaInsets();
     const navigation = useNavigation();
     const route = useRoute();
     const { script } = route.params;
 
-    // Pull addRecording from global context
     const { addRecording } = useScripts();
 
     // -- Camera & Recording State --
@@ -27,45 +26,55 @@ export default function TeleprompterScreen() {
     // -- Teleprompter State --
     const [isPlaying, setIsPlaying] = useState(false);
     const [speed, setSpeed] = useState(1);
+    const [fontSize, setFontSize] = useState(32);
+    const [isHorizontalMode, setIsHorizontalMode] = useState(false);
+    const [countdown, setCountdown] = useState(null); // 3, 2, 1, or null
 
-    // -- Dynamic Height Logic (The "TextArea" feel) --
-    // animatedHeight: An Animated.Value allows us to change the container's height continuously 
-    // without triggering React re-renders on every single frame, ensuring smooth 60fps performance.
-    // We start at 50% of the screen.
-    const animatedHeight = useRef(new Animated.Value(SCREEN_HEIGHT * 0.5)).current;
+    // -- UI State --
+    const [showSpeedControl, setShowSpeedControl] = useState(false);
+    const [showStyleControl, setShowStyleControl] = useState(false);
 
-    // lastHeight: Keeps track of where the height actually is in numbers. We need this 
-    // because Animated.Value doesn't easily let us read its current numeric value synchronously during a drag.
-    const lastHeight = useRef(SCREEN_HEIGHT * 0.5);
+    // -- Dynamic Layout Logic --
+    // In portrait, this controls height. In horizontal mode, it controls width.
+    const initialSize = isHorizontalMode ? SCREEN_WIDTH * 0.4 : SCREEN_HEIGHT * 0.5;
+    const animatedSize = useRef(new Animated.Value(initialSize)).current;
+    const lastSize = useRef(initialSize);
 
-    // panResponder: React Native's gesture tracking system. We attach this to the drag handle.
+    // We use a ref so our PanResponder can read it without re-rendering
+    const isHorizRef = useRef(isHorizontalMode);
+
+    useEffect(() => {
+        isHorizRef.current = isHorizontalMode;
+        // Adjust the size when orientation changes
+        const newSize = isHorizontalMode ? SCREEN_WIDTH * 0.4 : SCREEN_HEIGHT * 0.5;
+        animatedSize.setValue(newSize);
+        lastSize.current = newSize;
+    }, [isHorizontalMode, SCREEN_WIDTH, SCREEN_HEIGHT]);
+
     const panResponder = useRef(
         PanResponder.create({
-            // Tells React Native "Yes, we want to take over touch tracking for this element"
             onStartShouldSetPanResponder: () => true,
-
-            // Fires continuously as the user drags their finger
             onPanResponderMove: (evt, gestureState) => {
-                // gestureState.dy is the total vertical distance dragged since the touch started.
-                // We add it to our last known height to get the new height.
-                let newHeight = lastHeight.current + gestureState.dy;
+                const isHoriz = isHorizRef.current;
+                let newSize = isHoriz ? lastSize.current + gestureState.dx : lastSize.current + gestureState.dy;
+                if (newSize < 150) newSize = 150;
 
-                // Constraints: Don't let the box get impossibly small or overlap the top/bottom edges
-                if (newHeight < 150) newHeight = 150;
-                if (newHeight > SCREEN_HEIGHT - 150) newHeight = SCREEN_HEIGHT - 150;
+                // Dynamically fetch window dimensions so bounds are accurate in landscape
+                const { width: dynW, height: dynH } = Dimensions.get('window');
+                const maxDim = isHoriz ? dynW : dynH;
 
-                // Instantly update the native view's height (bypassing React state for speed)
-                animatedHeight.setValue(newHeight);
+                if (newSize > maxDim - 150) newSize = maxDim - 150;
+                animatedSize.setValue(newSize);
             },
-
-            // Fires when the user lifts their finger off the screen
             onPanResponderRelease: (evt, gestureState) => {
-                // Permanently save the new height so the next drag starts from the correct spot
-                lastHeight.current += gestureState.dy;
+                const isHoriz = isHorizRef.current;
+                lastSize.current += isHoriz ? gestureState.dx : gestureState.dy;
+                if (lastSize.current < 150) lastSize.current = 150;
 
-                // Apply the same constraints so our baseline doesn't drift out of bounds
-                if (lastHeight.current < 150) lastHeight.current = 150;
-                if (lastHeight.current > SCREEN_HEIGHT - 150) lastHeight.current = SCREEN_HEIGHT - 150;
+                const { width: dynW, height: dynH } = Dimensions.get('window');
+                const maxDim = isHoriz ? dynW : dynH;
+
+                if (lastSize.current > maxDim - 150) lastSize.current = maxDim - 150;
             },
         })
     ).current;
@@ -84,8 +93,6 @@ export default function TeleprompterScreen() {
             );
         })();
     }, []);
-
-    const [showSpeedControl, setShowSpeedControl] = useState(false);
 
     const autoScroll = () => {
         if (scrollRef.current) {
@@ -106,13 +113,50 @@ export default function TeleprompterScreen() {
         };
     }, [isPlaying, speed]);
 
+    useEffect(() => {
+        return () => {
+            // Revert to device default orientation when leaving prompter
+            ScreenOrientation.unlockAsync();
+        };
+    }, []);
+
     const toggleCameraFacing = () => {
         setFacing(current => (current === 'back' ? 'front' : 'back'));
     };
 
+    const toggleOrientation = async () => {
+        if (isHorizontalMode) {
+            await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+            setIsHorizontalMode(false);
+        } else {
+            await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT);
+            setIsHorizontalMode(true);
+        }
+    };
+
+    // Starts a 3-second countdown before performing an action (Play or Record)
+    const startActionWithCountdown = (callback) => {
+        setCountdown(3);
+        const interval = setInterval(() => {
+            setCountdown(prev => {
+                if (prev <= 1) {
+                    clearInterval(interval);
+                    callback();
+                    return null;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    };
+
     const toggleScroll = () => {
-        setIsPlaying(!isPlaying);
-        if (!isPlaying && showSpeedControl) setShowSpeedControl(false);
+        if (!isPlaying) {
+            startActionWithCountdown(() => setIsPlaying(true));
+        } else {
+            setIsPlaying(false);
+        }
+        if (showSpeedControl) setShowSpeedControl(false);
+        if (showStyleControl) setShowStyleControl(false);
     };
 
     const handleScroll = (event) => {
@@ -123,36 +167,32 @@ export default function TeleprompterScreen() {
         setSpeed(prev => Math.max(0.5, Math.min(5, prev + modifier)));
     };
 
-    // -- Video Recording Logic --
-    // This function handles the start and stop of the camera feed recording.
+    const changeFontSize = (modifier) => {
+        setFontSize(prev => Math.max(16, Math.min(80, prev + modifier)));
+    };
+
     const toggleRecording = async () => {
         if (!cameraRef.current) return;
 
         if (isRecording) {
-            // Stop recording: This will resolve the Promise returned by recordAsync
             cameraRef.current.stopRecording();
             setIsRecording(false);
         } else {
-            // Start recording
-            setIsRecording(true);
-            try {
-                // recordAsync starts the recording and waits until stopRecording is called.
-                // It then returns an object containing the URI of the saved .mp4 file.
-                const videoData = await cameraRef.current.recordAsync();
-
-                // Save it to our global gallery!
-                addRecording({
-                    uri: videoData.uri,
-                    title: script.title, // Attach the current script's title to the video metadata
-                });
-
-                // Keep the alert for good UX feedback
-                Alert.alert('Recording Saved!', `You can view this video in the Recordings tab.`);
-            } catch (error) {
-                console.error("Failed to record video:", error);
-                setIsRecording(false);
-                Alert.alert('Error', 'Failed to record video.');
-            }
+            startActionWithCountdown(async () => {
+                setIsRecording(true);
+                try {
+                    const videoData = await cameraRef.current.recordAsync();
+                    addRecording({
+                        uri: videoData.uri,
+                        title: script.title,
+                    });
+                    Alert.alert('Recording Saved!', `You can view this video in the Recordings tab.`);
+                } catch (error) {
+                    console.error("Failed to record video:", error);
+                    setIsRecording(false);
+                    Alert.alert('Error', 'Failed to record video.');
+                }
+            });
         }
     };
 
@@ -160,7 +200,7 @@ export default function TeleprompterScreen() {
     if (hasPermission === false) {
         return (
             <View style={styles.permissionContainer}>
-                <Text style={{ color: 'white' }}>No access to camera.</Text>
+                <Text style={{ color: 'white' }}>No access to camera/microphone.</Text>
                 <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
                     <Text style={{ color: 'white' }}>Go Back</Text>
                 </TouchableOpacity>
@@ -170,7 +210,6 @@ export default function TeleprompterScreen() {
 
     return (
         <View style={styles.container}>
-            {/* We attached cameraRef to the CameraView and explicitly set mode="video" */}
             <CameraView
                 ref={cameraRef}
                 style={StyleSheet.absoluteFill}
@@ -178,63 +217,108 @@ export default function TeleprompterScreen() {
                 mode="video"
             />
 
-            {/* Top Header */}
-            <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+            {/* Top Header - In Landscape, we avoid the side notch via insets */}
+            <View style={[styles.header, {
+                paddingTop: isHorizontalMode ? 20 : insets.top + 10,
+                paddingHorizontal: isHorizontalMode ? insets.left + 20 : 20,
+            }]}>
                 <TouchableOpacity style={styles.iconButton} onPress={() => navigation.goBack()}>
                     <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton}>
-                    <Ionicons name="lock-closed" size={20} color="#FF6B6B" />
+                <TouchableOpacity style={styles.iconButton} onPress={toggleOrientation}>
+                    {/* Highlight icon if already in horizontal mode */}
+                    <Ionicons
+                        name={isHorizontalMode ? "phone-portrait-outline" : "phone-landscape-outline"}
+                        size={24}
+                        color={isHorizontalMode ? Colors.primary : "#FFFFFF"}
+                    />
                 </TouchableOpacity>
             </View>
 
+            {/* Countdown Overlay */}
+            {countdown !== null && (
+                <View style={styles.countdownOverlay}>
+                    <Text style={styles.countdownText}>{countdown}</Text>
+                </View>
+            )}
+
             {/* Resizable Teleprompter Overlay */}
-            <Animated.View style={[styles.teleprompterOverlay, { height: animatedHeight }]}>
+            <Animated.View style={[
+                styles.teleprompterOverlay,
+                isHorizontalMode
+                    ? { width: animatedSize, height: '100%', flexDirection: 'row', paddingTop: 0 }
+                    : { height: animatedSize, width: '100%', flexDirection: 'column' }
+            ]}>
                 <ScrollView
                     ref={scrollRef}
                     onScroll={handleScroll}
                     scrollEventThrottle={16}
-                    contentContainerStyle={{ paddingBottom: 200, paddingTop: 40 }}
+                    style={isHorizontalMode ? { flex: 1, paddingLeft: insets.left } : undefined}
+                    contentContainerStyle={isHorizontalMode
+                        ? { paddingBottom: 150, paddingTop: 100 }
+                        : { paddingBottom: 200, paddingTop: 40 }
+                    }
                     showsVerticalScrollIndicator={false}
                 >
-                    <Text style={styles.teleprompterText}>{script.content}</Text>
+                    {/* Mirroring is completely removed based on user feedback */}
+                    <View>
+                        <Text style={[styles.teleprompterText, { fontSize: fontSize, lineHeight: fontSize * 1.3 }]}>
+                            {script.content}
+                        </Text>
+                    </View>
                 </ScrollView>
 
-                {/* THE DRAG HANDLE (Grab here to resize) */}
-                <View {...panResponder.panHandlers} style={styles.dragHandleContainer}>
-                    <View style={styles.dragHandleBar} />
+                <View {...panResponder.panHandlers} style={isHorizontalMode ? styles.dragHandleContainerHoriz : styles.dragHandleContainer}>
+                    <View style={isHorizontalMode ? styles.dragHandleBarHoriz : styles.dragHandleBar} />
                 </View>
             </Animated.View>
+            {!isHorizontalMode && <View style={{ flex: 1 }} />}
 
-            <View style={{ flex: 1 }} />
-
-            {/* Speed Controls */}
-            {showSpeedControl && (
-                <View style={styles.speedMenu}>
-                    <TouchableOpacity onPress={() => changeSpeed(-0.5)} style={styles.speedBtn}>
+            {/* Speed & Style Controls Popup */}
+            {(showSpeedControl || showStyleControl) && (
+                <View style={[styles.speedMenu, isHorizontalMode && styles.speedMenuHoriz]}>
+                    <TouchableOpacity
+                        onPress={() => showSpeedControl ? changeSpeed(-0.5) : changeFontSize(-4)}
+                        style={styles.speedBtn}
+                    >
                         <Ionicons name="remove" size={24} color="#FFFFFF" />
                     </TouchableOpacity>
+
                     <View style={styles.speedDisplay}>
-                        <Text style={styles.speedValue}>{speed.toFixed(1)}x</Text>
-                        <Text style={styles.speedLabel}>Speed</Text>
+                        <Text style={styles.speedValue}>
+                            {showSpeedControl ? `${speed.toFixed(1)}x` : `${fontSize}px`}
+                        </Text>
+                        <Text style={styles.speedLabel}>
+                            {showSpeedControl ? "Speed" : "Font Size"}
+                        </Text>
                     </View>
-                    <TouchableOpacity onPress={() => changeSpeed(0.5)} style={styles.speedBtn}>
+
+                    <TouchableOpacity
+                        onPress={() => showSpeedControl ? changeSpeed(0.5) : changeFontSize(4)}
+                        style={styles.speedBtn}
+                    >
                         <Ionicons name="add" size={24} color="#FFFFFF" />
                     </TouchableOpacity>
                 </View>
             )}
 
             {/* Bottom Controls */}
-            <View style={[styles.bottomControls, { paddingBottom: insets.bottom + 20 }]}>
+            <View style={[
+                isHorizontalMode ? styles.bottomControlsHoriz : styles.bottomControlsPortrait,
+                { paddingBottom: isHorizontalMode ? 20 : insets.bottom + 20 }
+            ]}>
                 <TouchableOpacity style={styles.controlSquare} onPress={toggleCameraFacing}>
                     <Ionicons name="camera-reverse-outline" size={28} color="#FFFFFF" />
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    style={[styles.controlSquare, showSpeedControl && { backgroundColor: Colors.primary }]}
-                    onPress={() => setShowSpeedControl(!showSpeedControl)}
+                    style={[styles.controlSquare, showStyleControl && { backgroundColor: Colors.primary }]}
+                    onPress={() => {
+                        setShowStyleControl(!showStyleControl);
+                        setShowSpeedControl(false);
+                    }}
                 >
-                    <Ionicons name="speedometer-outline" size={28} color="#FFFFFF" />
+                    <Ionicons name="text-outline" size={26} color="#FFFFFF" />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -244,8 +328,15 @@ export default function TeleprompterScreen() {
                     <View style={[styles.recordInner, isRecording && { borderRadius: 8, width: 30, height: 30 }]} />
                 </TouchableOpacity>
 
-                {/* Empty square to keep play button on the right */}
-                <View style={{ width: 50 }} />
+                <TouchableOpacity
+                    style={[styles.controlSquare, showSpeedControl && { backgroundColor: Colors.primary }]}
+                    onPress={() => {
+                        setShowSpeedControl(!showSpeedControl);
+                        setShowStyleControl(false);
+                    }}
+                >
+                    <Ionicons name="speedometer-outline" size={28} color="#FFFFFF" />
+                </TouchableOpacity>
 
                 <TouchableOpacity style={[styles.controlSquare, { backgroundColor: isPlaying ? Colors.card : Colors.primary }]} onPress={toggleScroll}>
                     <Ionicons name={isPlaying ? "pause" : "play"} size={28} color="#FFFFFF" />
@@ -286,6 +377,18 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    countdownOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 100,
+    },
+    countdownText: {
+        color: '#FFFFFF',
+        fontSize: 120,
+        fontWeight: 'bold',
+    },
     teleprompterOverlay: {
         backgroundColor: 'rgba(0,0,0,0.4)',
         paddingHorizontal: 20,
@@ -294,9 +397,7 @@ const styles = StyleSheet.create({
     },
     teleprompterText: {
         color: '#FFFFFF',
-        fontSize: 32,
         fontWeight: '500',
-        lineHeight: 44,
     },
     dragHandleContainer: {
         height: 30,
@@ -311,13 +412,37 @@ const styles = StyleSheet.create({
         borderRadius: 3,
         backgroundColor: 'rgba(255,255,255,0.3)',
     },
-    bottomControls: {
+    dragHandleContainerHoriz: {
+        width: 30,
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'transparent',
+    },
+    dragHandleBarHoriz: {
+        width: 5,
+        height: 40,
+        borderRadius: 3,
+        backgroundColor: 'rgba(255,255,255,0.3)',
+    },
+    bottomControlsPortrait: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
         backgroundColor: 'rgba(0,0,0,0.3)',
         paddingTop: 20,
+    },
+    bottomControlsHoriz: {
+        position: 'absolute',
+        bottom: 20,
+        right: 40,
+        flexDirection: 'row',
+        gap: 15,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        padding: 15,
+        borderRadius: 40,
+        alignItems: 'center',
     },
     controlSquare: {
         width: 50,
@@ -353,6 +478,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         borderRadius: 25,
         gap: 20,
+    },
+    speedMenuHoriz: {
+        position: 'absolute',
+        bottom: 100,
+        right: 40,
+        marginHorizontal: 0,
+        marginBottom: 0,
     },
     speedBtn: {
         width: 40,

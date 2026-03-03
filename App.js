@@ -25,7 +25,7 @@ export default function App() {
     <SafeAreaProvider>
       <ScriptProvider>
         <NavigationContainer theme={AppTheme}>
-          <StatusBar style="red" />
+          <StatusBar style="light" />
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="Tabs" component={TabNavigator} />
             {/* Modal for creating a script */}

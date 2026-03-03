@@ -27,27 +27,26 @@ This document provides a comprehensive analysis of the current codebase and a st
 
 ## 🛠 Features to Implement (Prioritized)
 
-### Phase 1: Core Functionality & Persistence
-| Feature | Description | Implementation Detail |
-| :--- | :--- | :--- |
-| **Data Persistence** | Keep scripts after app close. | Integrate `@react-native-async-storage/async-storage` into `ScriptContext.js`. |
-| **Video Recording** | Actually save the camera feed. | Use `CameraView.recordAsync()` to save `.mp4` files to device storage. |
-| **Recording Gallery** | View previous recordings. | Implement a list in `RecordingsScreen.js` that reads from the app's document directory. |
-| **Script Deletion** | Remove unwanted scripts. | Add a "Delete" function to the `ScriptContext`. |
+### Phase 1: Core Functionality & Persistence ✅
+| Feature | Description | Implementation Detail | Status |
+| :--- | :--- | :--- | :--- |
+| **Data Persistence** | Keep scripts after app close. | Integrate `@react-native-async-storage/async-storage` into `ScriptContext.js`. | ✅ Complete |
+| **Video Recording** | Actually save the camera feed. | Use `CameraView.recordAsync()` to save `.mp4` files to device storage. | ✅ Complete |
+| **Recording Gallery** | View previous recordings. | Implement a list in `RecordingsScreen.js` that reads from the app's document directory. | ✅ Complete |
+| **Script Deletion** | Remove unwanted scripts. | Add a "Delete" function to the `ScriptContext`. | ✅ Complete |
 
-### Phase 2: Professional Customization
-| Feature | Description | Implementation Detail |
-| :--- | :--- | :--- |
-| **Text Styling** | User-adjustable font size & colors. | Add a "Style" menu to `TeleprompterScreen` to adjust `fontSize` and `lineHeight`. |
-| **Mirror Mode** | Flip text for physical rigs. | Apply a CSS transform `scaleX(-1)` to the `ScrollView` or `Text` component. |
-| **Countdown Timer** | 3-2-1 timer before scroll starts. | Simple overlay state that triggers the `isPlaying` state after 3 seconds. |
+### Phase 2: Professional Customization 🚧
+| Feature | Description | Implementation Detail | Status |
+| :--- | :--- | :--- | :--- |
+| **Text Styling** | User-adjustable font size & colors. | Add a "Style" menu to `TeleprompterScreen` to adjust `fontSize` and `lineHeight`. | ✅ Complete |
+| **Landscape Mode** | Split-screen broadcasting. | Use `expo-screen-orientation` to enable side-by-side teleprompter and video in horizontal orientation. | ✅ Complete |
+| **Countdown Timer** | 3-2-1 timer before scroll starts. | Simple overlay state that triggers the `isPlaying` state after 3 seconds. | ✅ Complete |
 
 ### Phase 3: Advanced Features
 | Feature | Description | Implementation Detail |
 | :--- | :--- | :--- |
 | **PiP Mode** | Use prompter over other apps. | Use `expo-video` or native Android PiP modules for overlay support. |
 | **Voice Activation** | Scroll based on voice detection. | (Experimental) Integrate Speech-to-Text to sync scroll speed with speech. |
-| **Premium Tier** | Monetization. | Integrate `react-native-purchases` (RevenueCat) for subscriptions. |
 
 ---
 
