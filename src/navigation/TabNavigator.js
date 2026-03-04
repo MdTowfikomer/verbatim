@@ -1,19 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Modal from 'react-native-modal';
-import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
 import { Colors } from '../constants/Colors';
 import ScriptsScreen from '../screens/ScriptsScreen';
 import RecordingsScreen from '../screens/RecordingsScreen';
 import { useScripts } from '../context/ScriptContext';
+import { useFilePicker } from '../hooks/useFilePicker';
 
 const Tab = createBottomTabNavigator();
 
-// Custom Floating Action Button (FAB) component
 const CustomTabBarButton = ({ children, onPress }) => (
     <TouchableOpacity
         style={{
@@ -33,6 +31,7 @@ export default function TabNavigator() {
     const [isModalVisible, setModalVisible] = useState(false);
     const navigation = useNavigation();
     const { addScript } = useScripts();
+    const { pickAndProcessFile } = useFilePicker();
 
     const toggleModal = () => {
         setModalVisible(!isModalVisible);
@@ -45,75 +44,16 @@ export default function TabNavigator() {
 
     const handleUpload = async () => {
         try {
-            // Allow both text and pdf files
-            const result = await DocumentPicker.getDocumentAsync({
-                type: ['text/plain', 'application/pdf'],
-                copyToCacheDirectory: true,
-            });
-
-            if (result.canceled === false && result.assets && result.assets.length > 0) {
-                const file = result.assets[0];
-                let content = '';
-
-                if (file.mimeType === 'application/pdf') {
-                    // It's a PDF, we need to send it to our local API
-                    setModalVisible(false); // Close modal immediately so UI doesn't hang
-
-                    // FOR ANDROID EMULATOR: Use 10.0.2.2
-                    // FOR PHYSICAL DEVICES: Use your computer's IP (e.g., 192.168.1.XX)
-                    const computerIp = process.env.EXPO_PUBLIC_COMPUTER_IP;
-                    const apiUrl = `http://${computerIp}:3000/extract-pdf`;
-
-                    const formData = new FormData();
-                    formData.append('file', {
-                        uri: file.uri,
-                        name: file.name,
-                        type: file.mimeType
-                    });
-
-                    try {
-                        const response = await fetch(apiUrl, {
-                            method: 'POST',
-                            body: formData,
-                        });
-
-                        if (!response.ok) throw new Error('API response was not ok');
-
-                        const data = await response.json();
-                        content = data.text;
-                    } catch (e) {
-                        console.error("PDF Parsing error:", e);
-                        alert("Failed to parse PDF. Make sure your local extraction API is running on port 3000 (node index.js).");
-                        return;
-                    }
-
-                } else {
-                    // It's a text file, process locally
-                    content = await FileSystem.readAsStringAsync(file.uri, { encoding: FileSystem.EncodingType.UTF8 });
-                }
-
-                // create a script object
-                const now = new Date();
-                const wordCount = content.trim().length === 0 ? 0 : content.trim().split(/\s+/).length;
-                const newScript = {
-                    title: file.name.replace(/\.[^/.]+$/, ""), // remove extension
-                    content: content,
-                    wordCount: wordCount,
-                    date: now.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
-                    time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-                    id: Date.now().toString(),
-                };
-
-                // Add to context
+            const newScript = await pickAndProcessFile();
+            
+            if (newScript) {
                 addScript(newScript);
-                setModalVisible(false); // In case it wasn't closed already
-
-                // Navigate to Preview
+                setModalVisible(false);
                 navigation.navigate('Preview', { script: newScript });
             }
         } catch (error) {
             console.error("Error uploading file:", error);
-            alert("Failed to read the file.");
+            Alert.alert("Error", "Failed to process the file. Please check your internet connection and try again.");
         }
     };
 
@@ -145,7 +85,7 @@ export default function TabNavigator() {
                 />
                 <Tab.Screen
                     name="Add"
-                    component={ScriptsScreen} // Mock component
+                    component={ScriptsScreen}
                     options={{
                         tabBarIcon: ({ focused }) => (
                             <Ionicons name="add" size={32} color="#FFFFFF" />
@@ -167,7 +107,6 @@ export default function TabNavigator() {
                 />
             </Tab.Navigator>
 
-            {/* Bottom Sheet Modal */}
             <Modal
                 isVisible={isModalVisible}
                 onBackdropPress={toggleModal}
@@ -186,7 +125,7 @@ export default function TabNavigator() {
 
                     <TouchableOpacity style={styles.modalOption} onPress={handleUpload}>
                         <Ionicons name="cloud-upload-outline" size={20} color={Colors.primary} style={styles.modalIcon} />
-                        <Text style={styles.modalOptionText}>Upload file (TXxT or PDF)</Text>
+                        <Text style={styles.modalOptionText}>Upload file (TXT or PDF)</Text>
                         <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} style={{ marginLeft: 'auto' }} />
                     </TouchableOpacity>
                 </View>
@@ -242,3 +181,4 @@ const styles = StyleSheet.create({
         fontSize: 16,
     },
 });
+

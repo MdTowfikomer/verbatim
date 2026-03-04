@@ -1,53 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import { Colors } from '../constants/Colors';
 import { useScripts } from '../context/ScriptContext';
-
-// A dedicated component for video playback due to how the useVideoPlayer hook works
-const VideoPlaybackModal = ({ video, onClose }) => {
-    // Initialize the video player with the provided URI
-    const player = useVideoPlayer(video?.uri, player => {
-        player.play(); // Auto-play when opened
-    });
-
-    if (!video) return null;
-
-    return (
-        <Modal
-            animationType="slide"
-            presentationStyle="fullScreen"
-            onRequestClose={onClose}
-        >
-            <View style={modalStyles.container}>
-                {/* Header / Dismiss Button */}
-                <View style={modalStyles.header}>
-                    <Text style={modalStyles.title} numberOfLines={1}>{video.title}</Text>
-                    <TouchableOpacity onPress={onClose} style={modalStyles.closeBtn}>
-                        <Ionicons name="close" size={28} color="#FFF" />
-                    </TouchableOpacity>
-                </View>
-
-                {/* The actual Video Player component from expo-video */}
-                <VideoView
-                    style={modalStyles.videoView}
-                    player={player}
-                    fullscreenOptions={{ enable: true }}
-                    allowsPictureInPicture
-                    showsTimecodes
-                />
-            </View>
-        </Modal>
-    );
-};
+import VideoPlaybackModal from '../components/VideoPlaybackModal';
 
 export default function RecordingsScreen() {
     const insets = useSafeAreaInsets();
     const { recordings, deleteRecording } = useScripts();
-
-    // State to track which video is currently being viewed
     const [activeVideo, setActiveVideo] = useState(null);
 
     const handleDelete = (id, title) => {
@@ -71,12 +32,10 @@ export default function RecordingsScreen() {
             activeOpacity={0.7}
             onPress={() => setActiveVideo(item)}
         >
-            {/* Video Icon */}
             <View style={styles.iconContainer}>
                 <Ionicons name="videocam" size={24} color={Colors.primary} />
             </View>
 
-            {/* Recording Metadata */}
             <View style={styles.textContainer}>
                 <Text style={styles.title} numberOfLines={1}>
                     {item.title}
@@ -86,12 +45,10 @@ export default function RecordingsScreen() {
                 </Text>
             </View>
 
-            {/* Play Button */}
             <TouchableOpacity style={styles.actionButton} onPress={() => setActiveVideo(item)}>
                 <Ionicons name="play-circle" size={32} color={Colors.primary} />
             </TouchableOpacity>
 
-            {/* Delete Button */}
             <TouchableOpacity style={styles.actionButton} onPress={() => handleDelete(item.id, item.title)}>
                 <Ionicons name="trash-outline" size={24} color="#FF6B6B" />
             </TouchableOpacity>
@@ -118,7 +75,6 @@ export default function RecordingsScreen() {
                 />
             )}
 
-            {/* Render the Playback Modal if a video is active */}
             <VideoPlaybackModal
                 video={activeVideo}
                 onClose={() => setActiveVideo(null)}
@@ -126,47 +82,6 @@ export default function RecordingsScreen() {
         </View>
     );
 }
-
-const modalStyles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#000', // Black background for cinematic feel
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingTop: 50, // Safe area top margin
-        paddingBottom: 20,
-        zIndex: 10,
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-    },
-    title: {
-        color: '#FFF',
-        fontSize: 18,
-        fontWeight: 'bold',
-        flex: 1,
-        marginRight: 10,
-    },
-    closeBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    videoView: {
-        flex: 1,
-        width: '100%',
-        height: '100%',
-    }
-});
 
 const styles = StyleSheet.create({
     container: {
@@ -183,7 +98,7 @@ const styles = StyleSheet.create({
     },
     listContainer: {
         paddingHorizontal: 20,
-        paddingBottom: 100, // Space for bottom tab bar
+        paddingBottom: 100,
     },
     cardContainer: {
         flexDirection: 'row',
@@ -242,3 +157,4 @@ const styles = StyleSheet.create({
         lineHeight: 22,
     },
 });
+

@@ -1,54 +1,75 @@
 const express = require('express');
 const multer = require('multer');
-const { PDFParse } = require('pdf-parse');
+const pdf = require('pdf-parse');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
-// Enable CORS so our Expo app can talk to it
 app.use(cors());
 
-// Configure multer to store uploaded files in memory
-const upload = multer({ storage: multer.memoryStorage() });
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    message: { error: 'Too many requests, please try again later.' }
+});
+app.use(limiter);
 
-// Add a simple GET route so you can verify it in your browser
+app.use((req, res, next) => {
+    if (req.path === '/') return next();
+    
+    console.log('--- Request Debug ---');
+    console.log('Path:', req.path);
+    console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    
+    const apiKey = req.headers['x-api-key'];
+    const validApiKey = process.env.PDF_API_KEY || 'development_key';
+    
+    if (apiKey !== validApiKey) {
+        console.log('Auth Failed. Received:', apiKey, 'Expected:', validApiKey);
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    next();
+});
+
+const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }
+});
+
 app.get('/', (req, res) => {
-    res.send('✅ PDF Extraction API is running (v2)!');
+    res.send('✅ PDF Extraction API is running securely (v1.1.1)!');
 });
 
 app.post('/extract-pdf', upload.single('file'), async (req, res) => {
     console.log('📥 Received PDF upload request for:', req.file ? req.file.originalname : 'No file');
-
+    
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'No file uploaded' });
         }
 
-        // Initialize the parser with the uploaded file buffer
-        console.log(req.file.buffer)
-        const parser = new PDFParse({ data: req.file.buffer });
+        const data = await pdf(req.file.buffer);
 
-        // Extract the text using the v2 method
-        const result = await parser.getText();
-
-        // Return the extracted text
-        // v2 structure might differ slightly, but 'result.text' should be there
         res.json({
-            text: result.text,
-            info: result.info,
-            numPages: result.numpages || result.pages
+            text: data.text,
+            info: data.info,
+            numPages: data.numpages
         });
 
         console.log('✅ Successfully extracted text from:', req.file.originalname);
 
     } catch (error) {
-        console.error('❌ Full PDF parsing error:', error.message);
+        console.error('❌ PDF parsing error:', error.message);
         res.status(500).json({ error: 'Failed to parse PDF', message: error.message });
     }
 });
 
-app.listen(port, () => {
-    console.log(`PDF Extraction API running at http://localhost:${port}`);
-    console.log(`Endpoint: POST http://localhost:${port}/extract-pdf`);
-});
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+    app.listen(port, () => {
+        console.log(`PDF Extraction API running at http://localhost:${port}`);
+    });
+}
+
+module.exports = app;
